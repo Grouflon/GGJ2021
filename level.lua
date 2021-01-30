@@ -16,6 +16,21 @@ function make_wall(_x, _y, _sprite)
   return _w
 end
 
+function make_spike(_x, _y)
+  local _e = make_entity()
+  _e.body = collider.new(_x, _y, 0, 6, 8, 8, LAYER_SPIKES, _w)
+  _e.start = function(self)
+    physics.register(self.body)
+  end
+  _e.stop = function(self)
+    physics.unregister(self.body)
+  end
+  _e.draw = function(self)
+    spr(65, self.body.x, self.body.y)
+  end
+  return _e
+end
+
 function make_level(_x_min, _y_min, _x_max, _y_max)
   local _e = make_entity()
   _e.player = nil
@@ -27,14 +42,20 @@ function make_level(_x_min, _y_min, _x_max, _y_max)
   for _y = _y_min, _y_max do
   for _x = _x_min, _x_max do
     local _spr = mget(_x, _y)
+    local _px, _py = _x * 8, _y * 8
+    local _entity = nil
     if _spr == 0 then
       -- nop
     elseif _spr == 1 then -- cat
-      _e.player = make_cat(_x * 8, _y * 8)
-      add(_e.entities, _e.player)
+      _entity = make_cat(_px, _py)
+      _e.player = _entity
+    elseif _spr == 65 then
+      _entity = make_spike(_px, _py)
     elseif fget(_spr, 0) == true then -- wall
-      local _w = make_wall(_x * 8, _y * 8, _spr)
-      add(_e.entities, _w)
+      _entity = make_wall(_px, _py, _spr)
+    end
+    if _entity ~= nil then
+      add(_e.entities, _entity)
     end
   end
   end

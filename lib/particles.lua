@@ -23,6 +23,7 @@ function emitter.new()
   setmetatable(_e, emitter)
 
   _e.active = false
+  _e.to_spawn = 0
   _e.settings = {
     angle = setting.new( 0.0, 360.0 ),
     distance = {
@@ -36,7 +37,8 @@ function emitter.new()
       stop = setting.new( 1.0, 0.0 )
     },
     color = { 7, 6, 13, 5, 0 },
-    easing = easing.linear
+    easing = easing.linear,
+    type = 0 -- 0 is rect, 1 is circle
   }
 
   _e._particles = {}
@@ -58,20 +60,23 @@ function emitter:update(_x, _y, _dt)
       end
     end
 
-    if self.active then
+
+    if self.active or self.to_spawn > 0 then
       -- insert new particles in the free spots
       if _p.current_life < 0.0 and _spawn_time >= self._next_spawn then
         local _p = self:emit(_x, _y)
         self._particles[_i] = _p
 
+
         _p.current_life = _spawn_time
         _spawn_time = _spawn_time - self._next_spawn
         self._next_spawn = self.settings.rate:compute_random()
+        self.to_spawn = max(0, self.to_spawn - 1)
       end
     end
   end
 
-  if self.active then
+  if self.active or self.to_spawn > 0 then
     while _spawn_time >= self._next_spawn do
       local _p = self:emit(_x, _y)
       add(self._particles, _p)
@@ -79,6 +84,7 @@ function emitter:update(_x, _y, _dt)
       _p.current_life = _spawn_time
       _spawn_time = _spawn_time - self._next_spawn
       self._next_spawn = self.settings.rate:compute_random()
+      self.to_spawn = max(0, self.to_spawn - 1)
     end
 
     self._next_spawn = self._next_spawn - _spawn_time
@@ -97,7 +103,8 @@ function emitter:emit(_x, _y)
   }
   local _color = self.settings.color
   local _easing = self.settings.easing
-  return particle.new(_x, _y, _life, _dir, _dist_start, _dist_stop, _size, _color, _easing)
+  local _type = self.settings.type
+  return particle.new(_x, _y, _life, _dir, _dist_start, _dist_stop, _size, _color, _easing, _type)
 end
 
 function emitter:draw()
@@ -111,7 +118,7 @@ end
 -- particle
 particle = {}
 particle.__index = particle
-function particle.new(_x, _y, _life, _direction, _distance_start, _distance_stop, _size, _color, _easing)
+function particle.new(_x, _y, _life, _direction, _distance_start, _distance_stop, _size, _color, _easing, _type)
   local _p = {
     pos = vec2.new(_x, _y),
     current_life = 0.0,
@@ -121,19 +128,24 @@ function particle.new(_x, _y, _life, _direction, _distance_start, _distance_stop
     size = _size,
     color = _color,
     easing = _easing,
+    type = _type
   }
   setmetatable(_p, particle)
   return _p
 end
 
 function particle:draw()
-  local _t = self.easing(math.clamp01(self.current_life / self.life))
-  local _dist = math.lerp(self.distance[1], self.distance[2], _t)
+  local _t = self.easing(clamp01(self.current_life / self.life))
+  local _dist = lerp(self.distance[1], self.distance[2], _t)
   local _pos = self.pos:add(self.direction:mul(_dist))
-  local _size = math.lerp(self.size.start, self.size.stop, _t)
+  local _size = lerp(self.size.start, self.size.stop, _t)
   local _color_count = #self.color
   local _color = self.color[mid(1, _color_count, ceil(_t * _color_count))]
 
   local _half_size = _size * 0.5
-  rectfill(_pos.x - _half_size, _pos.y - _half_size, _pos.x + _half_size, _pos.y + _half_size, _color)
+  if self.type == 0 then
+    rectfill(_pos.x - _half_size, _pos.y - _half_size, _pos.x + _half_size, _pos.y + _half_size, _color)
+  elseif self.type == 1 then
+    circfill(_pos.x, _pos.y, _half_size, _color)
+  end
 end

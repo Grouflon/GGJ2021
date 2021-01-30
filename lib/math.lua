@@ -76,7 +76,7 @@ function lerp(_a, _b, _t)
   return _a + (_b - _a) * _t
 end
 
-function rnd(_x)
+function round(_x)
   local _flr = flr(_x)
   local _rmd = _x - _flr
   if _rmd > 0.5 then

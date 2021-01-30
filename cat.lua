@@ -52,6 +52,27 @@ function make_cat(_x, _y)
   _e.jump_curve_dir = -1
   _e.jump_curve_index = #JUMP_CURVE
   _e.run_animation_frame = 1
+  _e.dead = false
+
+  local _death_emitter = emitter.new()
+  _e.death_emitter = _death_emitter
+  --e.settings.rate.val = 0.08
+  _death_emitter.settings.rate.val = 0.7
+  --_death_emitter.settings.angle.val = 0
+  --_death_emitter.settings.angle.dev = 360.0
+  _death_emitter.settings.life.val = 30.0
+  _death_emitter.settings.life.dev = 2.0
+  _death_emitter.settings.distance.start.val = 3
+  _death_emitter.settings.distance.start.dev = 3
+  _death_emitter.settings.distance.stop.val = 12
+  _death_emitter.settings.distance.stop.dev = 4
+  _death_emitter.settings.size.start.val = 3.0
+  _death_emitter.settings.size.start.dev = 0.5
+  _death_emitter.settings.size.stop.val = 1.5
+  _death_emitter.settings.size.stop.dev = 0.5
+  _death_emitter.settings.easing = easing.quad_out
+  _death_emitter.settings.color = {9, 12, 1}
+  _death_emitter.settings.type = 1
 
   _e.animation = {
     states = {
@@ -114,7 +135,7 @@ function make_cat(_x, _y)
     local _cat = self.cat
     local _sign = bool_to_sign(_cat.flip)
     for _i = 1, SEGMENT_COUNT do
-      self.segments[_i][1] = _cat.body.x + rnd(_i * 0.7 * _sign)
+      self.segments[_i][1] = _cat.body.x + round(_i * 0.7 * _sign)
       self.segments[_i][2] = _cat.body.y
     end
   end
@@ -126,7 +147,7 @@ function make_cat(_x, _y)
       local _index = min(_i, #_cat.pos_samples)
       local _x, _y = _cat.pos_samples[_index][1], _cat.pos_samples[_index][2]
       local _dx = _x - _cat.body.x
-      local _min_dx = rnd(_i * 0.5* _sign)
+      local _min_dx = round(_i * 0.5* _sign)
       if _cat.flip then
         _x = _cat.body.x + max(_dx, _min_dx)
       else
@@ -273,6 +294,14 @@ function make_cat(_x, _y)
       self.jump_curve_index = #JUMP_CURVE
     end
 
+    if not self.dead and physics.test(self.body, LAYER_SPIKES) then
+      self.dead = true
+      local _e = make_cat_ghost(_body_x, _body_y)
+      add(level.entities, _e)
+      entity_manager.add(_e)
+      self.death_emitter.to_spawn = 8
+    end
+
     if _previous_grounded and not self.grounded then
       self.jump_curve_dir = -1
       self.jump_curve_index = #JUMP_CURVE
@@ -305,10 +334,20 @@ function make_cat(_x, _y)
     else
       self.run_animation_frame = (self.run_animation_frame + ACC_CURVE[self.acc_curve_index]) % #RUN_ANIMATION
     end
+
+    if self.dead then
+      self.death_emitter:update(_body_x, _body_y, _dt)
+    end
   end
 
 
   _e.draw = function(self)
+
+    if self.dead then
+      self.death_emitter:draw()
+      return
+    end
+
     local _b = self.body
     local _sign = bool_to_sign(self.flip)
 
@@ -346,7 +385,7 @@ function make_cat(_x, _y)
       local _x_ratio = _ty / _tail_length
       local _tx = _x_ratio * sin(time() * 1.0 + _ty * 0.1) * 3
 
-      local _nx = _tail_base_x + rnd(_tx)
+      local _nx = _tail_base_x + round(_tx)
       local _ny = _tail_base_y - _ty
       plot_line(_px, _py, _nx, _ny, 9)
       _px = _nx
@@ -391,5 +430,52 @@ function make_cat(_x, _y)
     renderer.spr(_head_sprite, _b.x, _b.y, 0, 1, 1, _flip)
   end
 
+  return _e
+end
+
+function make_cat_ghost(_x, _y)
+  local _e = make_entity()
+  _e.start_x = _x
+  _e.start_y = _y
+  _e.x = _x
+  _e.y = _y
+  _e.time = -6.0
+
+  local _emitter = emitter.new()
+  _e.emitter = _emitter
+  _emitter.settings.rate.val = 5.5
+  _emitter.settings.angle.val = -90
+  _emitter.settings.angle.dev = 10
+  _emitter.settings.life.val = 12.0
+  _emitter.settings.life.dev = 2.0
+  _emitter.settings.distance.start.val = 3
+  _emitter.settings.distance.start.dev = 3
+  _emitter.settings.distance.stop.val = 8
+  _emitter.settings.distance.stop.dev = 4
+  _emitter.settings.size.start.val = 4.0
+  _emitter.settings.size.start.dev = 0.5
+  _emitter.settings.size.stop.val = 1.0
+  _emitter.settings.size.stop.dev = 0.5
+  _emitter.settings.easing = easing.quad_out
+  _emitter.settings.color = {1, 1, 1}
+  _emitter.settings.type = 1
+
+  _e.update = function(self, _dt)
+    self.time = self.time + _dt
+
+    self.emitter.active = self.time > 0
+
+    self.x = self.start_x + sin(self.time * 0.01) * 5
+    self.y = self.start_y - self.time * 0.25
+
+    self.emitter.settings.angle.val = -90 + cos(self.time * 0.01) * 25
+    self.emitter:update(self.x + 4, self.y + 2, _dt)
+  end
+  _e.draw = function(self, _dt)
+    if self.time > 0 then
+      self.emitter:draw()
+      spr(9, self.x, self.y)
+    end
+  end
   return _e
 end
