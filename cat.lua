@@ -38,6 +38,7 @@ function make_cat(_x, _y)
   _e.ground_probe = collider.new(0, 0, 2, 0, 6, 1, LAYER_PROBE, _e)
   _e.left_wall_probe = collider.new(0, 0, 1, 2, 2, 8, LAYER_PROBE, _e)
   _e.right_wall_probe = collider.new(0, 0, 6, 2, 7, 8, LAYER_PROBE, _e)
+  _e.roof_probe = collider.new(0, 0, 2, 1, 6, 2, LAYER_PROBE, _e)
   _e.has_left_wall = false
   _e.has_right_wall = false
   _e.flip = false
@@ -153,13 +154,15 @@ function make_cat(_x, _y)
     physics.register(self.ground_probe)
     physics.register(self.left_wall_probe)
     physics.register(self.right_wall_probe)
+    physics.register(self.roof_probe)
   end
 
   _e.stop = function(self)
-    physics.unregister(self.ground_probe)
     physics.unregister(self.body)
+    physics.unregister(self.ground_probe)
     physics.unregister(self.left_wall_probe)
     physics.unregister(self.right_wall_probe)
+    physics.unregister(self.roof_probe)
   end
 
   _e.update = function(self, _dt)
@@ -191,7 +194,7 @@ function make_cat(_x, _y)
       self.flip = false
     end
 
-    local _jump_pressed = btnp(4) or btnp(2)
+    local _jump_pressed = btnp(4) -- or btnp(2)
     if _jump_pressed then
       self.jump_buffer = JUMP_BUFFER_TIME
     else
@@ -245,21 +248,29 @@ function make_cat(_x, _y)
 
     physics.move(_e.body, _dir_x, _dir_y, LAYER_WALLS)
 
-    self.ground_probe.x = self.body.x
-    self.ground_probe.y = self.body.y + 8
+    local _body_x, _body_y = self.body.x, self.body.y
+    self.ground_probe.x = _body_x
+    self.ground_probe.y = _body_y + 8
     local _previous_grounded = self.grounded
     self.grounded = physics.test(self.ground_probe, LAYER_WALLS)
 
-    self.left_wall_probe.x = self.body.x
-    self.left_wall_probe.y = self.body.y
-    self.right_wall_probe.x = self.body.x
-    self.right_wall_probe.y = self.body.y
+    self.left_wall_probe.x = _body_x
+    self.left_wall_probe.y = _body_y
+    self.right_wall_probe.x = _body_x
+    self.right_wall_probe.y = _body_y
+    self.roof_probe.x = _body_x
+    self.roof_probe.y = _body_y
 
     self.has_left_wall = false
     self.has_right_wall = false
     if not self.grounded then
       self.has_left_wall = physics.test(self.left_wall_probe, LAYER_WALLS)
       self.has_right_wall = physics.test(self.right_wall_probe, LAYER_WALLS)
+    end
+
+    if self.jump_curve_dir > 0 and not self.grounded and physics.test(self.roof_probe, LAYER_WALLS) then
+      self.jump_curve_dir = -1
+      self.jump_curve_index = #JUMP_CURVE
     end
 
     if _previous_grounded and not self.grounded then
