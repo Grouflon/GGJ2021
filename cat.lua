@@ -1,17 +1,22 @@
 -- cat.lua
 
-JUMP_CURVE = { -4, -4, -4, -4, -4, -3, -3, -3, -2, -2, -1, 0, 0, 0 }
+JUMP_CURVE = { -4, -4, -4, -3, -3, -3, -2, -2, -1, 0, 0, 0 }
 
 function make_cat(_x, _y)
   local _e = make_entity()
-  _e.body = collider.new(_x, _y, 1, 0, 6, 8, LAYER_PLAYER, _e)
-  _e.ground_probe = collider.new(0, 0, 1, 0, 6, 1, LAYER_PROBE, _e)
+  _e.body = collider.new(_x, _y, 1, 0, 7, 8, LAYER_PLAYER, _e)
+  _e.ground_probe = collider.new(0, 0, 1, 0, 7, 1, LAYER_PROBE, _e)
   _e.x = _x
   _e.y = _y
   _e.flip = false
   _e.grounded = false
   _e.jump_curve_dir = -1
   _e.jump_curve_index = #JUMP_CURVE
+  _e.segment_count = 5
+  _e.segments = {}
+  for _i = 0, _e.segment_count -  1 do
+    add(_e.segments, { _x, _y })
+  end
   _e.pos_samples = {}
 
   _e.start = function(self)
@@ -66,42 +71,48 @@ function make_cat(_x, _y)
     while (#self.pos_samples > 20) do
       deli(self.pos_samples)
     end
+
+    for _i = 1, self.segment_count do
+      local _index = min(_i, #self.pos_samples)
+      local _x, _y = self.pos_samples[_index][1], self.pos_samples[_index][2]
+      self.segments[_i][1] = _x
+      self.segments[_i][2] = _y
+    end
   end
 
 
   _e.draw = function(self)
     local _b = self.body
 
+    local _sign = 1
+    if self.flip then _sign = -1 end
 
+    -- segments
+    for _i, _segment in ipairs(self.segments) do
+      renderer.spr(2, _segment[1], _segment[2], 0, 1, 1, self.flip)
+    end
+    local _last_segment = last(self.segments)
 
-    -- trail
-    for _i = 0, 4 do
-      local _index = min(_i + 1, #self.pos_samples)
-      local _x, _y = self.pos_samples[_index][1], self.pos_samples[_index][2]
-      renderer.spr(2, _x, _y, 0)
+    -- tail
+    local _tail_base_x, _tail_base_y = _last_segment[1] + 4 - 1 * _sign, _last_segment[2] + 1
+    local _px, _py = _tail_base_x, _tail_base_y
+    local _tail_length = 5
+    for _ty = 0, _tail_length do
+      local _x_ratio = _ty / _tail_length
+      local _tx = _x_ratio * sin(time() * 1.0 + _ty * 0.1) * 3
 
-      if _i == 4 then
-
-        -- tail
-        local _px, _py = _x + 4, _y + 1
-        local _tail_length = 5
-        for _ty = 0, _tail_length do
-          local _x_ratio = _ty / _tail_length
-          local _tx = _x_ratio * sin(time() * 1.0 + _ty * 0.1) * 3
-
-          local _nx = _x + 4 + rnd(_tx)
-          local _ny = _y + 1 - _ty
-          plot_line(_px, _py, _nx, _ny, 9)
-          _px = _nx
-          _py = _ny
-        end
-
-        renderer.spr(3, _x, _y, 0, 1, 1, self.flip)
-      end
+      local _nx = _tail_base_x + rnd(_tx)
+      local _ny = _tail_base_y - _ty
+      plot_line(_px, _py, _nx, _ny, 9)
+      _px = _nx
+      _py = _ny
     end
 
-    --
+    -- legs
+    renderer.spr(3, _last_segment[1], _last_segment[2], 0, 1, 1, self.flip)
     renderer.spr(3, _b.x, _b.y, 0, 1, 1, self.flip)
+
+    -- head
     renderer.spr(1, _b.x, _b.y, 0, 1, 1, self.flip)
   end
 
