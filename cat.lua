@@ -230,8 +230,17 @@ function make_cat(_x, _y)
 
     -- segments
     local _segments = self.animation:get_segments()
+    local _p_x, _p_y = flr(_b.x), flr(_b.y)
     for _i, _segment in ipairs(_segments) do
-      renderer.spr(2, _segment[1], _segment[2], 0, 1, 1, self.flip)
+      local _fill_line = function(_x, _y)
+        local _sprite = 2
+        if _i == SEGMENT_COUNT then _sprite = 7 end
+        renderer.spr(_sprite, _x, _y, 0, 1, 1, self.flip)
+        return true
+      end
+      local _s_x, _s_y = flr(_segment[1]), flr(_segment[2])
+      visit_line(_p_x, _p_y, _s_x, _s_y, _fill_line)
+      _p_x, _p_y = _s_x, _s_y
     end
     local _last_segment = last(_segments)
 

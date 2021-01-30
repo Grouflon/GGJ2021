@@ -54,7 +54,7 @@ function visit_line(_x0, _y0, _x1, _y1, _function)
   if _y0<_y1 then _sy = 1 end
   local _err = _dx+_dy  --/* error value e_xy */
   while true do   --/* loop */
-      _function(_x0, _y0)
+      if not _function(_x0, _y0) then break end
       if (_x0 == _x1 and _y0 == _y1) then break end
       local _e2 = 2*_err
       if _e2 >= _dy then--/* e_xy+e_x > 0 */

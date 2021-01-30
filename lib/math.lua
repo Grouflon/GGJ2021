@@ -68,7 +68,6 @@ function vec2.lerp(_a, _b, _t)
 end
 
 -- math
-
 function clamp01(_v)
   return mid(0.0, 1.0, _v)
 end
