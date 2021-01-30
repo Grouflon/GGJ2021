@@ -87,6 +87,14 @@ function rnd(_x)
   end
 end
 
+function bool_to_sign(_b)
+  if _b then
+    return 1.0
+  else
+    return -1.0
+  end
+end
+
 D2P = 1 / 360.0 -- degrees to Pico-8 angle unit
 P2D = 360.0 -- Pico-8 angle unit to degrees
 

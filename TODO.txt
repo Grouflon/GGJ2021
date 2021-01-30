@@ -1,0 +1,2 @@
+Mettre un petit buffer d'une ou deux frames sur l'action de saut pour que les controles soient plus fluides
+Inverser la courbe de saut quand on tape un plafond
