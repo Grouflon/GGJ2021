@@ -1,6 +1,6 @@
 -- cat.lua
 
-JUMP_CURVE = { -4, -4, -3, -3, -3, -3, -2, -2, -1, -1, 0, 0, 0 }
+JUMP_CURVE = { -4, -4, -3, -3, -3, -2, -2, -2, -1, -1, 0, 0, 0 }
 ACC_CURVE = { 0, 0.25, 0.25, 0.25, 0.5, 0.5, 1 }
 SEGMENT_COUNT = 4
 JUMP_BUFFER_TIME = 6
@@ -34,12 +34,17 @@ end
 
 function make_cat(_x, _y)
   local _e = make_entity()
-  _e.body = collider.new(_x, _y, 2, 0, 6, 8, LAYER_PLAYER, _e)
+  _e.body = collider.new(_x, _y, 2, 2, 6, 8, LAYER_PLAYER, _e)
   _e.ground_probe = collider.new(0, 0, 2, 0, 6, 1, LAYER_PROBE, _e)
+  _e.left_wall_probe = collider.new(0, 0, 1, 2, 2, 8, LAYER_PROBE, _e)
+  _e.right_wall_probe = collider.new(0, 0, 6, 2, 7, 8, LAYER_PROBE, _e)
+  _e.has_left_wall = false
+  _e.has_right_wall = false
   _e.flip = false
   _e.grounded = false
   _e.jump_buffer = 0
   _e.can_jump_buffer = 0
+  _e.cant_affect_direction_buffer = 0
   _e.last_dir_x = 0
   _e.acc_curve_dir = -1
   _e.acc_curve_index = 1
@@ -51,6 +56,7 @@ function make_cat(_x, _y)
     states = {
       idle = make_animation_state(_e),
       trail = make_animation_state(_e),
+      pack = make_animation_state(_e),
     },
 
     update = function(self, _dt)
@@ -74,8 +80,13 @@ function make_cat(_x, _y)
         add(_segments, { 0, 0 })
       end
 
+      local _ratio_sum = 0.0
       for _id, _state in pairs(self.states) do
-        local _ratio = _state:ratio()
+        _ratio_sum = _ratio_sum + _state:ratio()
+      end
+
+      for _id, _state in pairs(self.states) do
+        local _ratio = _state:ratio() / _ratio_sum
         if _ratio > 0.0 then
           for _i = 1, SEGMENT_COUNT do
             _segments[_i][1] = _segments[_i][1] + _ratio * _state.segments[_i][1]
@@ -125,6 +136,14 @@ function make_cat(_x, _y)
     end
   end
 
+  _e.animation.states.pack.update = function(self, _dt)
+    local _cat = self.cat
+    for _i = 1, SEGMENT_COUNT do
+      self.segments[_i][1] = _cat.body.x
+      self.segments[_i][2] = _cat.body.y
+    end
+  end
+
   _e.animation:set_state("trail", 0.0)
 
   _e.pos_samples = {}
@@ -132,11 +151,15 @@ function make_cat(_x, _y)
   _e.start = function(self)
     physics.register(self.body)
     physics.register(self.ground_probe)
+    physics.register(self.left_wall_probe)
+    physics.register(self.right_wall_probe)
   end
 
   _e.stop = function(self)
     physics.unregister(self.ground_probe)
     physics.unregister(self.body)
+    physics.unregister(self.left_wall_probe)
+    physics.unregister(self.right_wall_probe)
   end
 
   _e.update = function(self, _dt)
@@ -153,7 +176,11 @@ function make_cat(_x, _y)
     else
       self.acc_curve_dir = -1
     end
-    self.acc_curve_index = mid(1, #ACC_CURVE, self.acc_curve_index + self.acc_curve_dir)
+    if self.cant_affect_direction_buffer <= 0 then
+      self.acc_curve_index = mid(1, #ACC_CURVE, self.acc_curve_index + self.acc_curve_dir)
+    else
+      self.cant_affect_direction_buffer = max(self.cant_affect_direction_buffer - 1, 0)
+    end
 
     local _dir_x, _dir_y = 0, 0
     _dir_x = self.last_dir_x * ACC_CURVE[flr(self.acc_curve_index)]
@@ -174,14 +201,39 @@ function make_cat(_x, _y)
     if self.jump_buffer > 0 and self.can_jump_buffer > 0 then
       self.jump_buffer = 0
       self.can_jump_buffer = 0
+      self.cant_affect_direction_buffer = 0
       self.jump_curve_dir = 1
       self.jump_curve_index = 1
       self.grounded = false
       --log("jump")
     end
 
+    if self.jump_buffer > 0 and (self.has_left_wall or self.has_right_wall) then
+      self.jump_buffer = 0
+      self.can_jump_buffer = 0
+      self.cant_affect_direction_buffer = 8
+      self.jump_curve_dir = 1
+      self.jump_curve_index = 1
+      self.acc_curve_index = #ACC_CURVE
+      if self.has_left_wall then
+        self.last_dir_x = 1
+      else
+        self.last_dir_x = -1
+      end
+      self.has_left_wall = false
+      self.has_right_wall = false
+    end
+
     if not self.grounded then
-      _dir_y = _dir_y + JUMP_CURVE[self.jump_curve_index] * self.jump_curve_dir
+      if self.jump_curve_dir < 0 then
+        if self.has_left_wall or self.has_right_wall then
+          self.jump_curve_dir = -0.5
+        else
+          self.jump_curve_dir = -1
+        end
+      end
+
+      _dir_y = _dir_y + JUMP_CURVE[flr(self.jump_curve_index)] * self.jump_curve_dir
       self.jump_curve_index = mid(self.jump_curve_index + self.jump_curve_dir, 1, #JUMP_CURVE)
       if self.jump_curve_index == #JUMP_CURVE then
         self.jump_curve_dir = -1
@@ -198,9 +250,26 @@ function make_cat(_x, _y)
     local _previous_grounded = self.grounded
     self.grounded = physics.test(self.ground_probe, LAYER_WALLS)
 
+    self.left_wall_probe.x = self.body.x
+    self.left_wall_probe.y = self.body.y
+    self.right_wall_probe.x = self.body.x
+    self.right_wall_probe.y = self.body.y
+
+    self.has_left_wall = false
+    self.has_right_wall = false
+    if not self.grounded then
+      self.has_left_wall = physics.test(self.left_wall_probe, LAYER_WALLS)
+      self.has_right_wall = physics.test(self.right_wall_probe, LAYER_WALLS)
+    end
+
     if _previous_grounded and not self.grounded then
       self.jump_curve_dir = -1
       self.jump_curve_index = #JUMP_CURVE
+    end
+
+    if not _previous_grounded and self.grounded then
+      self.body.y = ceil(self.body.y)
+      self.cant_affect_direction_buffer = 0
     end
 
     add(self.pos_samples, { self.body.x, self.body.y }, 1)
@@ -211,7 +280,11 @@ function make_cat(_x, _y)
     if self.grounded then
       self.animation:set_state("idle", 5)
     else
-      self.animation:set_state("trail", 5)
+      if self.has_left_wall or self.has_right_wall then
+        self.animation:set_state("pack", 5)
+      else
+        self.animation:set_state("trail", 5)
+      end
     end
 
     self.animation:update(_dt)
@@ -229,18 +302,22 @@ function make_cat(_x, _y)
     local _sign = bool_to_sign(self.flip)
 
     -- segments
+    --local _draw_segments = not (self.has_left_wall or self.has_right_wall)
+    local _draw_segments = true
     local _segments = self.animation:get_segments()
-    local _p_x, _p_y = flr(_b.x), flr(_b.y)
-    for _i, _segment in ipairs(_segments) do
-      local _fill_line = function(_x, _y)
-        local _sprite = 2
-        if _i == SEGMENT_COUNT then _sprite = 7 end
-        renderer.spr(_sprite, _x, _y, 0, 1, 1, self.flip)
-        return true
+    if _draw_segments then
+      local _p_x, _p_y = flr(_b.x), flr(_b.y)
+      for _i, _segment in ipairs(_segments) do
+        local _fill_line = function(_x, _y)
+          local _sprite = 2
+          if _i == SEGMENT_COUNT then _sprite = 7 end
+          renderer.spr(_sprite, _x, _y, 0, 1, 1, self.flip)
+          return true
+        end
+        local _s_x, _s_y = flr(_segment[1]), flr(_segment[2])
+        visit_line(_p_x, _p_y, _s_x, _s_y, _fill_line)
+        _p_x, _p_y = _s_x, _s_y
       end
-      local _s_x, _s_y = flr(_segment[1]), flr(_segment[2])
-      visit_line(_p_x, _p_y, _s_x, _s_y, _fill_line)
-      _p_x, _p_y = _s_x, _s_y
     end
     local _last_segment = last(_segments)
 
@@ -248,6 +325,10 @@ function make_cat(_x, _y)
     local _tail_offset = 1
     if not self.flip then _tail_offset = -2 end
     local _tail_base_x, _tail_base_y = _last_segment[1] + 4 + _tail_offset, _last_segment[2] + 2
+    if (self.has_left_wall or self.has_right_wall) then
+      _tail_base_x, _tail_base_y = _b.x + 4, _b.y
+    end
+
     local _px, _py = _tail_base_x, _tail_base_y
     local _tail_length = 5
     for _ty = 0, _tail_length do
@@ -262,32 +343,41 @@ function make_cat(_x, _y)
     end
 
     -- legs
-    local _front_legs_y_offset = 0
-    local _back_legs_y_offset = 0
-    local _front_legs_sprite = 3
-    local _back_legs_sprite = 3
-    if not self.grounded then
-      if self.jump_curve_dir > 0 then
-        _front_legs_y_offset = -1
-        _back_legs_y_offset = 1
-      elseif self.jump_curve_dir < 0 then
-        if self.jump_curve_index < 10 then
-          _front_legs_y_offset = 1
+    local _draw_legs = not (self.has_left_wall or self.has_right_wall)
+    if _draw_legs then
+      local _front_legs_y_offset = 0
+      local _back_legs_y_offset = 0
+      local _front_legs_sprite = 3
+      local _back_legs_sprite = 3
+      if not self.grounded then
+        if self.jump_curve_dir > 0 then
+          _front_legs_y_offset = -1
+          _back_legs_y_offset = 1
+        elseif self.jump_curve_dir < 0 then
+          if self.jump_curve_index < 10 then
+            _front_legs_y_offset = 1
+          end
+          _back_legs_y_offset = -1
         end
-        _back_legs_y_offset = -1
+      else
+        if self.acc_curve_index ~= 1 then
+          local _anim_frame = flr(self.run_animation_frame)
+          _front_legs_sprite = RUN_ANIMATION[_anim_frame + 1]
+          _back_legs_sprite = RUN_ANIMATION[((_anim_frame + 6) % #RUN_ANIMATION) + 1]
+        end
       end
-    else
-      if self.acc_curve_index ~= 1 then
-        local _anim_frame = flr(self.run_animation_frame)
-        _front_legs_sprite = RUN_ANIMATION[_anim_frame + 1]
-        _back_legs_sprite = RUN_ANIMATION[((_anim_frame + 6) % #RUN_ANIMATION) + 1]
-      end
+      renderer.spr(_back_legs_sprite, _last_segment[1] + 2 * _sign, _last_segment[2] + _back_legs_y_offset, 0, 1, 1, self.flip)
+      renderer.spr(_front_legs_sprite, _b.x, _b.y + _front_legs_y_offset, 0, 1, 1, self.flip)
     end
-    renderer.spr(_back_legs_sprite, _last_segment[1] + 2 * _sign, _last_segment[2] + _back_legs_y_offset, 0, 1, 1, self.flip)
-    renderer.spr(_front_legs_sprite, _b.x, _b.y + _front_legs_y_offset, 0, 1, 1, self.flip)
 
     -- head
-    renderer.spr(1, _b.x, _b.y, 0, 1, 1, self.flip)
+    local _head_sprite = 1
+    local _flip = self.flip
+    if self.has_left_wall or self.has_right_wall then
+      _head_sprite = 8
+      _flip = self.has_right_wall
+    end
+    renderer.spr(_head_sprite, _b.x, _b.y, 0, 1, 1, _flip)
   end
 
   return _e
