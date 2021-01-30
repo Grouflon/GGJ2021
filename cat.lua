@@ -1,7 +1,11 @@
 -- cat.lua
 
-JUMP_CURVE = { -4, -4, -4, -3, -3, -3, -2, -2, -1, 0, 0, 0 }
+JUMP_CURVE = { -4, -4, -3, -3, -3, -3, -2, -2, -1, -1, 0, 0, 0 }
+ACC_CURVE = { 0, 0.25, 0.25, 0.25, 0.5, 0.5, 1 }
 SEGMENT_COUNT = 4
+JUMP_BUFFER_TIME = 6
+CAN_JUMP_BUFFER_TIME = 6
+RUN_ANIMATION = { 3, 3, 3, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 4, 4, 4, 4, 4, 4, 4, 4 }
 
 function make_animation_state(_cat)
   local _s = {}
@@ -34,8 +38,14 @@ function make_cat(_x, _y)
   _e.ground_probe = collider.new(0, 0, 2, 0, 6, 1, LAYER_PROBE, _e)
   _e.flip = false
   _e.grounded = false
+  _e.jump_buffer = 0
+  _e.can_jump_buffer = 0
+  _e.last_dir_x = 0
+  _e.acc_curve_dir = -1
+  _e.acc_curve_index = 1
   _e.jump_curve_dir = -1
   _e.jump_curve_index = #JUMP_CURVE
+  _e.run_animation_frame = 1
 
   _e.animation = {
     states = {
@@ -92,7 +102,7 @@ function make_cat(_x, _y)
     local _cat = self.cat
     local _sign = bool_to_sign(_cat.flip)
     for _i = 1, SEGMENT_COUNT do
-      self.segments[_i][1] = _cat.body.x + flr(_i * 1 * _sign)
+      self.segments[_i][1] = _cat.body.x + rnd(_i * 0.7 * _sign)
       self.segments[_i][2] = _cat.body.y
     end
   end
@@ -104,7 +114,7 @@ function make_cat(_x, _y)
       local _index = min(_i, #_cat.pos_samples)
       local _x, _y = _cat.pos_samples[_index][1], _cat.pos_samples[_index][2]
       local _dx = _x - _cat.body.x
-      local _min_dx = flr(_i * 0.5* _sign)
+      local _min_dx = rnd(_i * 0.5* _sign)
       if _cat.flip then
         _x = _cat.body.x + max(_dx, _min_dx)
       else
@@ -130,9 +140,23 @@ function make_cat(_x, _y)
   end
 
   _e.update = function(self, _dt)
+    local _left_down = btn(0)
+    local _right_down = btn(1)
+
+    if self.acc_curve_index == 1 then
+      if _left_down and not _right_down then self.last_dir_x = -1 end
+      if not _left_down and _right_down then self.last_dir_x = 1 end
+    end
+
+    if (_left_down and self.last_dir_x == -1) or (_right_down and self.last_dir_x == 1) then
+      self.acc_curve_dir = 1
+    else
+      self.acc_curve_dir = -1
+    end
+    self.acc_curve_index = mid(1, #ACC_CURVE, self.acc_curve_index + self.acc_curve_dir)
+
     local _dir_x, _dir_y = 0, 0
-    if btn(0) then _dir_x = _dir_x - 1 end
-    if btn(1) then _dir_x = _dir_x + 1 end
+    _dir_x = self.last_dir_x * ACC_CURVE[flr(self.acc_curve_index)]
 
     if _dir_x < 0 then
       self.flip = true
@@ -140,7 +164,16 @@ function make_cat(_x, _y)
       self.flip = false
     end
 
-    if self.grounded and btnp(4) then
+    local _jump_pressed = btnp(4) or btnp(2)
+    if _jump_pressed then
+      self.jump_buffer = JUMP_BUFFER_TIME
+    else
+      self.jump_buffer = max(self.jump_buffer - 1, 0)
+    end
+
+    if self.jump_buffer > 0 and self.can_jump_buffer > 0 then
+      self.jump_buffer = 0
+      self.can_jump_buffer = 0
       self.jump_curve_dir = 1
       self.jump_curve_index = 1
       self.grounded = false
@@ -153,7 +186,10 @@ function make_cat(_x, _y)
       if self.jump_curve_index == #JUMP_CURVE then
         self.jump_curve_dir = -1
       end
+    else
+      self.can_jump_buffer = CAN_JUMP_BUFFER_TIME
     end
+    self.can_jump_buffer = max(0, self.can_jump_buffer - 1)
 
     physics.move(_e.body, _dir_x, _dir_y, LAYER_WALLS)
 
@@ -161,9 +197,6 @@ function make_cat(_x, _y)
     self.ground_probe.y = self.body.y + 8
     local _previous_grounded = self.grounded
     self.grounded = physics.test(self.ground_probe, LAYER_WALLS)
-
-    if not _previous_grounded and self.grounded then
-    end
 
     if _previous_grounded and not self.grounded then
       self.jump_curve_dir = -1
@@ -182,6 +215,12 @@ function make_cat(_x, _y)
     end
 
     self.animation:update(_dt)
+
+    if self.acc_curve_index == 1 or not self.grounded then
+      self.run_animation_frame = 0
+    else
+      self.run_animation_frame = (self.run_animation_frame + ACC_CURVE[self.acc_curve_index]) % #RUN_ANIMATION
+    end
   end
 
 
@@ -214,8 +253,29 @@ function make_cat(_x, _y)
     end
 
     -- legs
-    renderer.spr(3, _last_segment[1] + 2 * _sign, _last_segment[2], 0, 1, 1, self.flip)
-    renderer.spr(3, _b.x, _b.y, 0, 1, 1, self.flip)
+    local _front_legs_y_offset = 0
+    local _back_legs_y_offset = 0
+    local _front_legs_sprite = 3
+    local _back_legs_sprite = 3
+    if not self.grounded then
+      if self.jump_curve_dir > 0 then
+        _front_legs_y_offset = -1
+        _back_legs_y_offset = 1
+      elseif self.jump_curve_dir < 0 then
+        if self.jump_curve_index < 10 then
+          _front_legs_y_offset = 1
+        end
+        _back_legs_y_offset = -1
+      end
+    else
+      if self.acc_curve_index ~= 1 then
+        local _anim_frame = flr(self.run_animation_frame)
+        _front_legs_sprite = RUN_ANIMATION[_anim_frame + 1]
+        _back_legs_sprite = RUN_ANIMATION[((_anim_frame + 6) % #RUN_ANIMATION) + 1]
+      end
+    end
+    renderer.spr(_back_legs_sprite, _last_segment[1] + 2 * _sign, _last_segment[2] + _back_legs_y_offset, 0, 1, 1, self.flip)
+    renderer.spr(_front_legs_sprite, _b.x, _b.y + _front_legs_y_offset, 0, 1, 1, self.flip)
 
     -- head
     renderer.spr(1, _b.x, _b.y, 0, 1, 1, self.flip)
