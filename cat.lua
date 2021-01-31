@@ -36,8 +36,8 @@ function make_cat(_x, _y)
   local _e = make_entity()
   _e.body = collider.new(_x, _y, 2, 2, 6, 8, LAYER_PLAYER, _e)
   _e.ground_probe = collider.new(0, 0, 2, 0, 6, 1, LAYER_PROBE, _e)
-  _e.left_wall_probe = collider.new(0, 0, 1, 2, 2, 8, LAYER_PROBE, _e)
-  _e.right_wall_probe = collider.new(0, 0, 6, 2, 7, 8, LAYER_PROBE, _e)
+  _e.left_wall_probe = collider.new(0, 0, 1, 2, 2, 6, LAYER_PROBE, _e)
+  _e.right_wall_probe = collider.new(0, 0, 6, 2, 7, 6, LAYER_PROBE, _e)
   _e.roof_probe = collider.new(0, 0, 2, 1, 6, 2, LAYER_PROBE, _e)
   _e.has_left_wall = false
   _e.has_right_wall = false
@@ -55,6 +55,7 @@ function make_cat(_x, _y)
   _e.dead = false
   _e.can_move = true
   _e.attached = false
+  _e.time_ungrounded = 0
 
   local _death_emitter = emitter.new()
   _e.death_emitter = _death_emitter
@@ -189,7 +190,6 @@ function make_cat(_x, _y)
   end
 
   _e.update = function(self, _dt)
-
     self.attached = false
 
     local _left_down = btn(0) and self.can_move
@@ -234,7 +234,7 @@ function make_cat(_x, _y)
       self.jump_curve_dir = 1
       self.jump_curve_index = 1
       self.grounded = false
-      -- play sfx
+      sfx(6, 2)
     end
 
     if self.jump_buffer > 0 and (self.has_left_wall or self.has_right_wall) then
@@ -251,9 +251,12 @@ function make_cat(_x, _y)
       end
       self.has_left_wall = false
       self.has_right_wall = false
+      sfx(6, 2)
     end
 
     if not self.grounded then
+      self.time_ungrounded = self.time_ungrounded + 1
+
       if self.jump_curve_dir < 0 then
         if self.has_left_wall or self.has_right_wall then
           self.jump_curve_dir = -0.5
@@ -300,14 +303,28 @@ function make_cat(_x, _y)
     self.roof_probe.x = _body_x
     self.roof_probe.y = _body_y
 
+    local _previous_has_left_wall = self.has_left_wall
+    local _previous_has_right_wall = self.has_right_wall
+
+    local _left_probe_enabled = self.has_left_wall or self.flip and self.time_ungrounded > 4
+    local _right_probe_enabled = self.has_right_wall or not self.flip and self.time_ungrounded > 4
+
     self.has_left_wall = false
     self.has_right_wall = false
 
     if not self.grounded then
       local _out_wall_colliders = {}
-      self.has_left_wall = physics.test(self.left_wall_probe, LAYER_WALLS, _out_wall_colliders)
-      self.has_right_wall = physics.test(self.right_wall_probe, LAYER_WALLS, _out_wall_colliders)
+      if _left_probe_enabled then
+        self.has_left_wall = physics.test(self.left_wall_probe, LAYER_WALLS, _out_wall_colliders)
+      end
+      if _right_probe_enabled then
+        self.has_right_wall = physics.test(self.right_wall_probe, LAYER_WALLS, _out_wall_colliders)
+      end
       try_attach(self, _out_wall_colliders)
+    end
+
+    if (not _previous_has_left_wall and self.has_left_wall) or (not _previous_has_right_wall and self.has_right_wall) then
+      sfx(7, 1)
     end
 
     if self.jump_curve_dir > 0 and not self.grounded and physics.test(self.roof_probe, LAYER_WALLS) then
@@ -321,7 +338,8 @@ function make_cat(_x, _y)
       add(level.entities, _e)
       entity_manager.add(_e)
       self.death_emitter.to_spawn = 8
-      -- play sfx
+      sfx(4)
+      sfx(5,3)
     end
 
     local _out_kittens_col = {}
@@ -329,7 +347,7 @@ function make_cat(_x, _y)
       for _i, _k in ipairs(_out_kittens_col) do
         if not _k.entity.found then
           _k.entity.found = true
-          -- play sfx
+          sfx(0)
         end
       end
     end
@@ -342,6 +360,10 @@ function make_cat(_x, _y)
     if not _previous_grounded and self.grounded then
       self.body.y = ceil(self.body.y)
       self.cant_affect_direction_buffer = 0
+      self.time_ungrounded = 0
+      if self.can_move then
+        sfx(7, 1)
+      end
     end
 
     add(self.pos_samples, { self.body.x, self.body.y }, 1)

@@ -4,7 +4,7 @@ TRANSITION_TIME = 60
 
 blackout_color = 0
 
-override_level_start = 4
+--override_level_start = 5
 level_list = {
   { 28, 0, 43, 15 }, -- move tuto
   { 45, 0, 60, 15 }, -- gaps tuto
@@ -172,7 +172,7 @@ game.states.game = {
             blackout_color = 9
             game.next_level = -1 --end game
           end
-          game:set_state("exit_level")
+          game:set_state("victory")
         end
       end
     end
@@ -192,6 +192,23 @@ game.states.dead = {
     if death_timer > 200 or death_timer > 25 and _skip_wanted then
       game.next_level = game.current_level
       blackout_color = 0
+      game:set_state("exit_level")
+    end
+  end,
+  exit = function()
+  end,
+}
+
+game.states.victory = {
+  enter = function()
+    jingle_timer = 0
+    sfx(0, -2)
+    sfx(2)
+  end,
+  update = function()
+    jingle_timer = jingle_timer + 1
+    if jingle_timer > 92 then
+      sfx(1)
       game:set_state("exit_level")
     end
   end,
