@@ -47,6 +47,10 @@ function vec2:normalized()
   end
 end
 
+function vec2:flr()
+  return vec2.new(flr(self.x), flr(self.y))
+end
+
 function vec2:is_zero(_threshold)
   _threshold = _threshold or 0.01
   return abs(self.x) <= _threshold and abs(self.y) <= _threshold
@@ -66,6 +70,8 @@ function vec2.lerp(_a, _b, _t)
     math.lerp(_a.y, _b.y, _t)
   )
 end
+
+
 
 -- math
 function clamp01(_v)
@@ -107,6 +113,21 @@ function collision.AABB_AABB(_x_min_A, _y_min_A, _x_max_A, _y_max_A, _x_min_B, _
   or _x_max_B <= _x_min_A
   or _y_max_B <= _y_min_A
   )
+end
+
+-- from https://stackoverflow.com/questions/563198/how-do-you-detect-where-two-line-segments-intersect
+function collision.segment_segment(_p0_x, _p0_y, _p1_x, _p1_y, _p2_x, _p2_y, _p3_x, _p3_y)
+  local _s1_x, _s1_y = _p1_x - _p0_x, _p1_y - _p0_y
+  local _s2_x, _s2_y = _p3_x - _p2_x, _p3_y - _p2_y
+
+  local _s = (-_s1_y * (_p0_x - _p2_x) + _s1_x * (_p0_y - _p2_y)) / (-_s2_x * _s1_y + _s1_x * _s2_y);
+  local _t = ( _s2_x * (_p0_y - _p2_y) - _s2_y * (_p0_x - _p2_x)) / (-_s2_x * _s1_y + _s1_x * _s2_y);
+
+  if _s >= 0 and _s <= 1 and _t >= 0 and _t <= 1 then
+      return true, _p0_x + (_t * _s1_x), _p0_y + (_t * _s1_y)
+    end
+
+  return false
 end
 
 -- easing {}

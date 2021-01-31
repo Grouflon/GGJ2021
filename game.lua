@@ -37,6 +37,7 @@ game.states.enter_level = {
     level.player.can_move = false
     entity_manager.add(level)
     blackout:fade_out(TRANSITION_TIME, 0)
+    tutorial_step = 0
   end,
   update = function()
     if blackout.timer <= 0 then
