@@ -53,6 +53,7 @@ function make_cat(_x, _y)
   _e.jump_curve_index = #JUMP_CURVE
   _e.run_animation_frame = 1
   _e.dead = false
+  _e.can_move = true
 
   local _death_emitter = emitter.new()
   _e.death_emitter = _death_emitter
@@ -187,8 +188,9 @@ function make_cat(_x, _y)
   end
 
   _e.update = function(self, _dt)
-    local _left_down = btn(0)
-    local _right_down = btn(1)
+
+    local _left_down = btn(0) and self.can_move
+    local _right_down = btn(1) and self.can_move
 
     if self.acc_curve_index == 1 then
       if _left_down and not _right_down then self.last_dir_x = -1 end
@@ -215,7 +217,7 @@ function make_cat(_x, _y)
       self.flip = false
     end
 
-    local _jump_pressed = btnp(4) -- or btnp(2)
+    local _jump_pressed = btnp(4) and self.can_move
     if _jump_pressed then
       self.jump_buffer = JUMP_BUFFER_TIME
     else

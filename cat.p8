@@ -19,20 +19,33 @@ LAYER_SPIKES = 0b1000
 #include cat.lua
 #include camera.lua
 #include level.lua
+#include blackout.lua
+#include game.lua
+
+level_list = {
+  { 0, 0, 26, 21 }
+}
 
 level = nil
+blackout = nil
 
 function _init()
   poke(0x5F5C, 255) -- set the initial delay before repeating input. 255 means never repeat.
-  level = make_level(0, 0, 26, 21)
-  entity_manager.add(level)
+
+  blackout = make_blackout()
+  game.next_level = 1
+  game:set_state("enter_level")
 end
 
 function _update60()
   cls()
   entity_manager.update()
+  blackout:update(1)
+
+  game:update()
 end
 
+fade_time = 0
 function _draw()
 
   level.camera:camera()
@@ -47,6 +60,17 @@ function _draw()
   --physics.draw(LAYER_ENEMY, 14)
 
   camera()
+  blackout:draw()
+
+  --[[for _n, _state in pairs(game.states) do
+    if _state == game.current_state then
+      print(_n)
+    end
+  end]]--
+
+  --color()
+  --print(stat(0))
+
   draw_log()
 end
 
