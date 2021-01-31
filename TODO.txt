@@ -1,1 +1,2 @@
-Make world bounds not wall jumpable
+Make world bounds not wall jumpable (je sais pas en fait)
+Changer l'origin du fade
