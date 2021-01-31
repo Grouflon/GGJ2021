@@ -4,7 +4,7 @@ TRANSITION_TIME = 60
 
 blackout_color = 0
 
---override_level_start = 5
+--override_level_start = 6
 level_list = {
   { 28, 0, 43, 15 }, -- move tuto
   { 45, 0, 60, 15 }, -- gaps tuto
@@ -78,9 +78,11 @@ game.states.splash_screen = {
 
     rect(5, 5, 121, 121, 1)
 
-    color(9)
-    print("yet another cat game" , 25, 44)
-    print("press 🅾️ to start" , 31, 80)
+    local _title_x, _title_y = 24, 44
+    print("yet another cat game" , _title_x, _title_y, 1)
+    print("yet another cat game" , _title_x + 1, _title_y + 1, 2)
+    print("yet another cat game" , _title_x + 2, _title_y + 2, 9)
+    print("press 🅾️ to start" , 31, 80, 1)
     color()
   end,
   exit = function()
@@ -117,8 +119,8 @@ game.states.end_screen = {
 
     color(9)
     print("the end" , 51, 30)
-    print("a game by remi bismuth" , 22, 50)
-    print("made in 48h for ggj2021" , 20, 58)
+    print("a game by remi bismuth" , 20, 50)
+    print("made in 48h for ggj2021" , 18, 58)
     print("press 🅾️ to continue" , 24, 85)
     color()
   end,

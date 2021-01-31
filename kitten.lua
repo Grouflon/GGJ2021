@@ -71,7 +71,7 @@ function make_kitten(_x, _y)
         --log(tostring(_origin).." "..tostring(_origin2))
         local _total_len = _origin:sub(_origin2):len()
         local _final_radius = 4
-        local _color = 2
+        local _color = 13
 
         --[[visit_line(_origin2.x, _origin2.y, _origin.x, _origin.y, function(__x, __y)
           local _l = vec2.new(__x,__y):sub(_origin2):len()
