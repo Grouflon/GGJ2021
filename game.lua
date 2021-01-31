@@ -4,6 +4,19 @@ TRANSITION_TIME = 60
 
 blackout_color = 0
 
+override_level_start = 4
+level_list = {
+  { 28, 0, 43, 15 }, -- move tuto
+  { 45, 0, 60, 15 }, -- gaps tuto
+  { 60, 0, 75, 23 }, -- wall jump tuto
+  { 75, 0, 112, 20 }, -- tri-kitten
+  { 60, 23, 75, 38 }, -- platform tuto
+  { 27, 15, 60, 30 }, -- platform 2 floors
+  { 112, 0, 127, 20 }, -- hard platform stuff
+
+  --{ 0, 0, 26, 21 }, -- debug level
+}
+
 game = {
   states = {},
   current_state = nil,
@@ -66,7 +79,7 @@ game.states.splash_screen = {
     rect(5, 5, 121, 121, 1)
 
     color(9)
-    print("the game with a cat" , 26, 44)
+    print("yet another cat game" , 25, 44)
     print("press 🅾️ to start" , 31, 80)
     color()
   end,
@@ -88,6 +101,7 @@ game.states.end_screen = {
       if blackout.timer <= 0 then
         if btnp(4) then
           self.advancing = true
+          blackout_color = 0
           blackout:fade_in(100, blackout_color)
         end
       end
@@ -174,7 +188,8 @@ game.states.dead = {
   end,
   update = function()
     death_timer = death_timer + 1
-    if death_timer > 200 or death_timer > 25 and btn(4) then
+    local _skip_wanted = btn(4) or btn(0) or btn(1)
+    if death_timer > 200 or death_timer > 25 and _skip_wanted then
       game.next_level = game.current_level
       blackout_color = 0
       game:set_state("exit_level")

@@ -54,6 +54,7 @@ function make_cat(_x, _y)
   _e.run_animation_frame = 1
   _e.dead = false
   _e.can_move = true
+  _e.attached = false
 
   local _death_emitter = emitter.new()
   _e.death_emitter = _death_emitter
@@ -189,6 +190,8 @@ function make_cat(_x, _y)
 
   _e.update = function(self, _dt)
 
+    self.attached = false
+
     local _left_down = btn(0) and self.can_move
     local _right_down = btn(1) and self.can_move
 
@@ -271,11 +274,24 @@ function make_cat(_x, _y)
 
     physics.move(_e.body, _dir_x, _dir_y, LAYER_WALLS)
 
+    function try_attach(self, _colliders)
+      if not self.attached then
+        for _, _col in ipairs(_colliders) do
+          if _col.entity.attached_cats then
+            add(_col.entity.attached_cats, self)
+            self.attached = true
+          end
+        end
+      end
+    end
+
     local _body_x, _body_y = self.body.x, self.body.y
     self.ground_probe.x = _body_x
     self.ground_probe.y = _body_y + 8
     local _previous_grounded = self.grounded
-    self.grounded = physics.test(self.ground_probe, LAYER_WALLS)
+    local _out_ground_colliders = {}
+    self.grounded = physics.test(self.ground_probe, LAYER_WALLS, _out_ground_colliders)
+    try_attach(self, _out_ground_colliders)
 
     self.left_wall_probe.x = _body_x
     self.left_wall_probe.y = _body_y
@@ -286,9 +302,12 @@ function make_cat(_x, _y)
 
     self.has_left_wall = false
     self.has_right_wall = false
+
     if not self.grounded then
-      self.has_left_wall = physics.test(self.left_wall_probe, LAYER_WALLS)
-      self.has_right_wall = physics.test(self.right_wall_probe, LAYER_WALLS)
+      local _out_wall_colliders = {}
+      self.has_left_wall = physics.test(self.left_wall_probe, LAYER_WALLS, _out_wall_colliders)
+      self.has_right_wall = physics.test(self.right_wall_probe, LAYER_WALLS, _out_wall_colliders)
+      try_attach(self, _out_wall_colliders)
     end
 
     if self.jump_curve_dir > 0 and not self.grounded and physics.test(self.roof_probe, LAYER_WALLS) then
