@@ -231,7 +231,7 @@ function make_cat(_x, _y)
       self.jump_curve_dir = 1
       self.jump_curve_index = 1
       self.grounded = false
-      --log("jump")
+      -- play sfx
     end
 
     if self.jump_buffer > 0 and (self.has_left_wall or self.has_right_wall) then
@@ -302,6 +302,17 @@ function make_cat(_x, _y)
       add(level.entities, _e)
       entity_manager.add(_e)
       self.death_emitter.to_spawn = 8
+      -- play sfx
+    end
+
+    local _out_kittens_col = {}
+    if self.can_move and not self.dead and physics.test(self.body, LAYER_KITTEN, _out_kittens_col) then
+      for _i, _k in ipairs(_out_kittens_col) do
+        if not _k.entity.found then
+          _k.entity.found = true
+          -- play sfx
+        end
+      end
     end
 
     if _previous_grounded and not self.grounded then

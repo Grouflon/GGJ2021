@@ -30,7 +30,7 @@ game = {
 
 game.states.enter_level = {
   enter = function()
-    local _l = level_list[game.next_level]
+    local _l = level_list[game.next_level + 1]
     assert(_l ~= nil)
     game.current_level = game.next_level
     level = make_level(_l[1], _l[2], _l[3], _l[4])
@@ -55,6 +55,21 @@ game.states.game = {
     local _player = level.player
     if _player.dead then
       game:set_state("dead")
+    else
+      if #level.kittens > 0 then -- if no kitten in the level, you just can't win
+        local _found_all_kittens = true
+        for _i, _k in ipairs(level.kittens) do
+          if not _k.found then
+            _found_all_kittens = false
+            break
+          end
+        end
+
+        if _found_all_kittens then
+          game.next_level = (game.current_level + 1) % #level_list
+          game:set_state("exit_level")
+        end
+      end
     end
   end,
   exit = function()

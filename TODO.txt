@@ -1,1 +1,1 @@
-Inverser la courbe de saut quand on tape un plafond
+Make world bounds not wall jumpable
