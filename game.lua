@@ -121,7 +121,8 @@ game.states.end_screen = {
     print("the end" , 51, 30)
     print("a game by remi bismuth" , 20, 50)
     print("made in 48h for ggj2021" , 18, 58)
-    print("press 🅾️ to continue" , 24, 85)
+    print("thank you for playing" , 21, 75)
+    print("press 🅾️ to restart" , 27, 92, 1)
     color()
   end,
   exit = function()
